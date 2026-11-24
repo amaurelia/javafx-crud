@@ -9,7 +9,9 @@ import com.example.model.Persona;
 import javafx.beans.property.ReadOnlyObjectWrapper;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
+import javafx.collections.transformation.FilteredList;
 import javafx.fxml.FXML;
+import javafx.scene.control.CheckBox;
 import javafx.scene.control.ComboBox;
 import javafx.scene.control.Label;
 import javafx.scene.control.TableColumn;
@@ -30,6 +32,12 @@ public class PersonaController {
 
     @FXML
     private TextField edadField;
+
+    @FXML
+    private TextField filtroEdadField;
+
+    @FXML
+    private CheckBox soloEstudiantesCheck;
 
     @FXML
     private TableView<Persona> personaTable;
@@ -57,6 +65,7 @@ public class PersonaController {
 
     private final PersonaDAO personaDAO = new PersonaDAO();
     private final ObservableList<Persona> personas = FXCollections.observableArrayList();
+    private final FilteredList<Persona> personasFiltradas = new FilteredList<>(personas, p -> true);
 
     @FXML
     private void initialize() {
@@ -65,7 +74,7 @@ public class PersonaController {
             Persona.ROL_ESTUDIANTE,
             Persona.ROL_PROFESOR));
 
-        personaTable.setItems(personas);
+        personaTable.setItems(personasFiltradas);
         personaTable.getSelectionModel().selectedItemProperty().addListener((obs, anterior, actual) -> {
             if (actual != null) {
                 cargarFormulario(actual);
@@ -138,6 +147,52 @@ public class PersonaController {
         limpiarFormulario();
         personaTable.getSelectionModel().clearSelection();
         mostrarMensaje("Formulario limpio.");
+    }
+
+    @FXML
+    private void onFiltrar() {
+        Integer edadMinima = null;
+        String edadTexto = filtroEdadField.getText();
+
+        if (edadTexto != null && !edadTexto.trim().isEmpty()) {
+            try {
+                edadMinima = Integer.parseInt(edadTexto.trim());
+            } catch (NumberFormatException e) {
+                mostrarMensaje("La edad del filtro debe ser un numero entero.");
+                return;
+            }
+        }
+
+        boolean soloEstudiantes = soloEstudiantesCheck.isSelected();
+
+        final Integer edadFiltro = edadMinima;
+        final boolean filtrarSoloEstudiantes = soloEstudiantes;
+
+        personasFiltradas.setPredicate(persona -> {
+            boolean cumpleEdad = edadFiltro != null && persona.getEdad() > edadFiltro;
+            boolean cumpleEstudiante = filtrarSoloEstudiantes && Persona.ROL_ESTUDIANTE.equals(persona.getRol());
+
+            if (edadFiltro != null && filtrarSoloEstudiantes) {
+                return cumpleEdad || cumpleEstudiante;
+            }
+            if (edadFiltro != null) {
+                return cumpleEdad;
+            }
+            if (filtrarSoloEstudiantes) {
+                return cumpleEstudiante;
+            }
+            return true;
+        });
+
+        mostrarMensaje("Filtro aplicado. Registros mostrados: " + personasFiltradas.size());
+    }
+
+    @FXML
+    private void onQuitarFiltro() {
+        filtroEdadField.clear();
+        soloEstudiantesCheck.setSelected(false);
+        personasFiltradas.setPredicate(p -> true);
+        mostrarMensaje("Filtro quitado. Registros mostrados: " + personasFiltradas.size());
     }
 
     private void configurarTabla() {
